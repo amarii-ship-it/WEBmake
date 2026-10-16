@@ -1,0 +1,667 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Portfolio Editor</title>
+<style>
+:root{--bg:#f6f6f4;--panel:#fff;--fg:#1a1a1a;--muted:#6f6f6f;--line:#e3e3e0;--accent:#2b59c3;--danger:#b3261e;--ok:#1e7d3a;--r:8px}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,'Segoe UI',sans-serif;display:flex;flex-direction:column}
+button,input,select,textarea{font:inherit;color:inherit}
+.top{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);flex:none}
+.top h1{font-size:15px;margin:0;font-weight:650}
+.top .grow{flex:1}
+#status{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+#status.ok{color:var(--ok)} #status.err{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:7px 12px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:#bbb}
+.btn.primary{background:var(--fg);border-color:var(--fg);color:#fff}
+.btn.primary:disabled{opacity:.45;cursor:not-allowed}
+.btn.small{padding:4px 8px;font-size:12px}
+.btn.danger{color:var(--danger)}
+.icon-btn{border:0;background:none;padding:4px 6px;cursor:pointer;border-radius:4px;color:var(--muted);font-size:15px;line-height:1}
+.icon-btn:hover{background:var(--bg);color:var(--fg)}
+.icon-btn.on{color:#d49b00}
+.wrap{flex:1;display:flex;min-height:0}
+.panel{width:440px;flex:none;overflow:auto;background:var(--panel);border-right:1px solid var(--line);padding:6px 0 60px}
+.preview{flex:1;display:flex;flex-direction:column;min-width:0}
+.pv-bar{display:flex;gap:6px;padding:8px 12px;align-items:center;color:var(--muted);font-size:12px}
+.pv-bar .seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--panel)}
+.pv-bar .seg button{border:0;background:none;padding:5px 10px;cursor:pointer}
+.pv-bar .seg button[aria-pressed=true]{background:var(--fg);color:#fff}
+.pv-stage{flex:1;display:flex;justify-content:center;padding:0 12px 12px;min-height:0}
+#frame{width:100%;height:100%;border:1px solid var(--line);border-radius:6px;background:#fff;transition:width .2s}
+.phone #frame{width:390px}
+details{border-bottom:1px solid var(--line)}
+summary{padding:14px 18px;font-weight:600;cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px}
+summary::-webkit-details-marker{display:none}
+summary::before{content:'▸';color:var(--muted);transition:transform .15s}
+details[open]>summary::before{transform:rotate(90deg)}
+summary .hint{font-weight:400;color:var(--muted);font-size:12px;margin-left:auto}
+.sec{padding:0 18px 18px}
+label{display:block;margin:10px 0 0}
+label>span{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+input[type=text],input[type=email],input[type=url],input[type=password],select,textarea{width:100%;border:1px solid var(--line);border-radius:6px;padding:7px 9px;background:#fff}
+textarea{min-height:88px;resize:vertical}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:transparent}
+.row{display:flex;gap:10px}
+.row>*{flex:1;min-width:0}
+.check{display:flex;align-items:center;gap:8px;margin-top:12px}
+.check input{margin:0}
+.note{font-size:12px;color:var(--muted);margin:8px 0 0}
+.note a{color:var(--accent)}
+.gal{border:1px solid var(--line);border-radius:var(--r);margin:12px 0;background:#fcfcfb}
+.gal-head{display:flex;align-items:center;gap:6px;padding:8px 8px 8px 12px;border-bottom:1px solid var(--line)}
+.gal-head strong{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gal-body{padding:0 12px 12px}
+.drop{margin-top:12px;border:1.5px dashed #c9c9c4;border-radius:var(--r);padding:16px;text-align:center;color:var(--muted);cursor:pointer;background:#fff}
+.drop.over{border-color:var(--accent);color:var(--accent);background:#f2f5fd}
+.imgs{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.img-row{display:grid;grid-template-columns:22px 56px 1fr auto;gap:8px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:6px;padding:6px}
+.img-row.dragging{opacity:.4}
+.img-row.drop-before{box-shadow:0 -3px 0 var(--accent)}
+.handle{cursor:grab;color:#aaa;text-align:center;user-select:none}
+.img-row img{width:56px;height:56px;object-fit:cover;border-radius:4px;background:var(--bg)}
+.img-row .fields{display:flex;flex-direction:column;gap:4px;min-width:0}
+.img-row input{padding:4px 7px;font-size:13px}
+.img-row .acts{display:flex;flex-direction:column;align-items:center}
+.badge{font-size:11px;color:var(--accent);margin-left:4px}
+.about-img{display:flex;gap:10px;align-items:center;margin-top:8px}
+.about-img img{width:64px;height:64px;object-fit:cover;border-radius:6px;background:var(--bg)}
+.add-gal{margin-top:8px;width:100%}
+.busy{position:fixed;inset:0;background:rgba(255,255,255,.6);display:flex;align-items:center;justify-content:center;z-index:9;font-weight:600}
+.busy[hidden]{display:none}
+.menu{position:relative}
+.menu-list{position:absolute;right:0;top:calc(100% + 4px);background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.1);padding:4px;z-index:5;min-width:200px}
+.menu-list[hidden]{display:none}
+.menu-list button{display:block;width:100%;text-align:left;border:0;background:none;padding:8px 10px;border-radius:5px;cursor:pointer}
+.menu-list button:hover{background:var(--bg)}
+@media (max-width:900px){
+  .wrap{flex-direction:column}
+  .panel{width:auto;border-right:0;flex:1}
+  .preview{display:none}
+  body.show-preview .preview{display:flex;position:fixed;inset:52px 0 0;background:var(--bg);z-index:4}
+  .phone #frame{width:100%}
+}
+@media (min-width:901px){ #pvToggle{display:none} }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Portfolio editor</h1>
+  <span id="status">Loading…</span>
+  <span class="grow"></span>
+  <button class="btn" id="pvToggle" type="button">Preview</button>
+  <div class="menu">
+    <button class="btn" id="moreBtn" type="button" aria-haspopup="true" aria-expanded="false">More ▾</button>
+    <div class="menu-list" id="moreList" hidden>
+      <button type="button" id="openSite">Open live site</button>
+      <button type="button" id="dlJson">Download backup (site.json)</button>
+      <button type="button" id="importJson">Import site.json…</button>
+      <button type="button" id="reload">Discard changes &amp; reload</button>
+    </div>
+  </div>
+  <button class="btn primary" id="publish" type="button" disabled>Publish</button>
+</header>
+<div class="wrap">
+  <div class="panel" id="panel"></div>
+  <div class="preview">
+    <div class="pv-bar">
+      <div class="seg" role="group" aria-label="Preview size">
+        <button type="button" id="pvDesk" aria-pressed="true">Desktop</button>
+        <button type="button" id="pvPhone" aria-pressed="false">Phone</button>
+      </div>
+      <span>Preview of unpublished changes. Click images to test the lightbox.</span>
+    </div>
+    <div class="pv-stage" id="stage"><iframe id="frame" title="Site preview" src="index.html?preview"></iframe></div>
+  </div>
+</div>
+<div class="busy" id="busy" hidden>Working…</div>
+<input type="file" id="importFile" accept="application/json,.json" hidden>
+
+<script>
+(() => {
+'use strict';
+
+const FONTS = ['Inter', 'DM Sans', 'Work Sans', 'Space Grotesk', 'Bebas Neue', 'Oswald', 'Anton', 'Playfair Display', 'DM Serif Display', 'Lora'];
+const ASPECTS = [['1/1', 'Square'], ['4/5', 'Portrait 4:5'], ['2/3', 'Tall 2:3'], ['3/2', 'Landscape 3:2'], ['16/9', 'Wide 16:9']];
+const TILE_ASPECTS = [['12/5', 'Wide banner'], ['16/9', 'Widescreen'], ['3/2', 'Landscape'], ['1/1', 'Square'], ['4/5', 'Portrait']];
+const FULL_MAX = 2560;     // longest edge of the lightbox image
+const THUMB_SHORT = 800;   // shortest edge of the grid thumbnail
+const KEY = 'webmake:';    // storage prefix (github.io pages on one account share storage)
+
+const $ = id => document.getElementById(id);
+const panel = $('panel'), frame = $('frame'), statusEl = $('status'), publishBtn = $('publish');
+
+let site = null;            // the draft being edited
+let pending = {};           // path -> base64 for new uploads not yet in the repo
+let previewFiles = {};      // path -> data URL so the preview can show new uploads
+let loadedPaths = new Set();// image paths referenced when we loaded (to clean up removed ones)
+let dirty = false;
+let previewReady = false;
+
+// ---------- storage ----------
+function store(k, v, remember) {
+  try {
+    if (v == null) { localStorage.removeItem(KEY + k); sessionStorage.removeItem(KEY + k); return; }
+    (remember ? localStorage : sessionStorage).setItem(KEY + k, v);
+    if (!remember) localStorage.removeItem(KEY + k);
+  } catch (e) {}
+}
+function load(k) {
+  try { return sessionStorage.getItem(KEY + k) || localStorage.getItem(KEY + k) || ''; } catch (e) { return ''; }
+}
+function guessRepo() {
+  const m = /^([^.]+)\.github\.io$/i.exec(location.hostname);
+  const seg = location.pathname.split('/').filter(Boolean)[0];
+  return { owner: m ? m[1] : '', repo: m && seg && !/\.html$/.test(seg) ? seg : '' };
+}
+const conn = {
+  owner: load('owner') || guessRepo().owner,
+  repo: load('repo') || guessRepo().repo,
+  branch: load('branch') || 'main',
+  token: load('token'),
+  remember: (() => { try { return !!localStorage.getItem(KEY + 'token'); } catch (e) { return false; } })(),
+  ok: false
+};
+
+// ---------- small helpers ----------
+function el(tag, attrs, ...kids) {
+  const n = document.createElement(tag);
+  for (const k in attrs || {}) {
+    const v = attrs[k];
+    if (v == null || v === false) continue;
+    if (k === 'class') n.className = v;
+    else if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
+    else if (k === 'value') n.value = v;
+    else if (k === 'checked') n.checked = !!v;
+    else n.setAttribute(k, v === true ? '' : v);
+  }
+  for (const kid of kids.flat(Infinity)) if (kid != null && kid !== false) n.append(kid);
+  return n;
+}
+function setStatus(msg, kind) { statusEl.textContent = msg; statusEl.className = kind || ''; statusEl.title = msg; }
+function busy(on, msg) { $('busy').hidden = !on; $('busy').textContent = msg || 'Working…'; }
+function slug(s) { return String(s || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'item'; }
+function rand() { return Math.random().toString(36).slice(2, 7); }
+function titleFromFile(name) { return name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim(); }
+function previewSrc(p) { return previewFiles[p] || p; }
+
+function normalize(d) {
+  d = d && typeof d === 'object' ? d : {};
+  d.social = Object.assign({ instagram: '', artstation: '' }, d.social);
+  d.home = Object.assign({ style: 'first', label: 'Work', intro: '', tileAspect: '12/5' }, d.home);
+  d.theme = Object.assign({ mode: 'light', nav: 'top', accent: '#111111', headingFont: 'Inter', bodyFont: 'Inter', gap: 14 }, d.theme);
+  d.galleries = Array.isArray(d.galleries) ? d.galleries : [];
+  for (const g of d.galleries) {
+    g.images = Array.isArray(g.images) ? g.images : [];
+    if (g.showInNav == null) g.showInNav = true;
+    g.layout = g.layout === 'masonry' ? 'masonry' : 'grid';
+    g.aspect = g.aspect || '1/1';
+    g.columns = g.columns || 3;
+  }
+  for (const k of ['name', 'tagline', 'email', 'about', 'aboutImage', 'contactText']) d[k] = d[k] || '';
+  return d;
+}
+function referencedPaths(d) {
+  const s = new Set();
+  if (d.aboutImage) s.add(d.aboutImage);
+  for (const g of d.galleries || []) {
+    if (g.cover) s.add(g.cover);
+    for (const im of g.images || []) { if (im.src) s.add(im.src); if (im.thumb) s.add(im.thumb); }
+  }
+  return s;
+}
+
+// ---------- change tracking + preview ----------
+let pvTimer;
+function changed() {
+  dirty = true;
+  publishBtn.disabled = false;
+  setStatus(conn.ok ? 'Unpublished changes' : 'Unpublished changes — connect GitHub to publish');
+  clearTimeout(pvTimer);
+  pvTimer = setTimeout(sendPreview, 120);
+}
+function sendPreview() {
+  if (!previewReady || !site) return;
+  frame.contentWindow.postMessage({ type: 'webmake:data', site: JSON.parse(JSON.stringify(site)), files: previewFiles }, location.origin);
+}
+function previewGo(hash) {
+  try { if (frame.contentWindow.location.hash !== hash) frame.contentWindow.location.hash = hash; } catch (e) {}
+}
+window.addEventListener('message', e => {
+  if (e.origin !== location.origin || !e.data) return;
+  if (e.data.type === 'webmake:ready') { previewReady = true; sendPreview(); }
+});
+window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+// ---------- GitHub ----------
+async function gh(path, opts = {}) {
+  const res = await fetch('https://api.github.com' + path, {
+    method: opts.method || 'GET',
+    headers: {
+      Authorization: 'Bearer ' + conn.token,
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      ...(opts.body ? { 'Content-Type': 'application/json' } : {})
+    },
+    body: opts.body ? JSON.stringify(opts.body) : undefined
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const hint = res.status === 401 ? ' (token is wrong or expired)' : res.status === 404 ? ' (check owner, repo, branch, and that the token can access this repo)' : res.status === 403 ? ' (token lacks Contents: write permission)' : '';
+    throw new Error((data.message || 'GitHub error ' + res.status) + hint);
+  }
+  return data;
+}
+const repoPath = () => `/repos/${encodeURIComponent(conn.owner)}/${encodeURIComponent(conn.repo)}`;
+function b64ToText(b64) {
+  const bin = atob(b64.replace(/\n/g, ''));
+  return new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0)));
+}
+
+async function connect() {
+  if (!conn.owner || !conn.repo || !conn.token) { setStatus('Fill in owner, repo and token first', 'err'); return; }
+  if (dirty && !confirm('Connecting reloads the site from GitHub and discards your unpublished changes. Continue?')) return;
+  busy(true, 'Connecting to GitHub…');
+  try {
+    const f = await gh(`${repoPath()}/contents/site.json?ref=${encodeURIComponent(conn.branch)}`);
+    const d = JSON.parse(b64ToText(f.content));
+    conn.ok = true;
+    store('owner', conn.owner, true); store('repo', conn.repo, true); store('branch', conn.branch, true);
+    store('token', conn.token, conn.remember);
+    setSite(d);
+    setStatus('Connected to ' + conn.owner + '/' + conn.repo, 'ok');
+  } catch (e) {
+    conn.ok = false;
+    setStatus('Could not connect: ' + e.message, 'err');
+    renderPanel();
+  } finally { busy(false); }
+}
+
+async function publish() {
+  if (!conn.ok) {
+    setStatus('Connect to GitHub first (top section of the panel)', 'err');
+    const d = panel.querySelector('details'); if (d) { d.open = true; d.scrollIntoView({ behavior: 'smooth' }); }
+    return;
+  }
+  const problems = validate();
+  if (problems.length && !confirm('Heads up:\n\n• ' + problems.join('\n• ') + '\n\nPublish anyway?')) return;
+  busy(true, 'Publishing…');
+  try {
+    const refs = referencedPaths(site);
+    const ref = await gh(`${repoPath()}/git/ref/heads/${encodeURIComponent(conn.branch)}`);
+    const head = ref.object.sha;
+    const commit = await gh(`${repoPath()}/git/commits/${head}`);
+    const tree = [];
+    const uploads = Object.keys(pending).filter(p => refs.has(p));
+    let n = 0;
+    for (const p of uploads) {
+      busy(true, `Uploading images… ${++n}/${uploads.length}`);
+      const blob = await gh(`${repoPath()}/git/blobs`, { method: 'POST', body: { content: pending[p], encoding: 'base64' } });
+      tree.push({ path: p, mode: '100644', type: 'blob', sha: blob.sha });
+    }
+    // Remove image files that nothing points at any more (only ones under images/ that we know about).
+    const gone = [...loadedPaths].filter(p => !refs.has(p) && /^images\//.test(p) && !pending[p]);
+    if (gone.length) {
+      const existing = await gh(`${repoPath()}/git/trees/${commit.tree.sha}?recursive=1`);
+      const have = new Set((existing.tree || []).map(t => t.path));
+      for (const p of gone) if (have.has(p)) tree.push({ path: p, mode: '100644', type: 'blob', sha: null });
+    }
+    tree.push({ path: 'site.json', mode: '100644', type: 'blob', content: JSON.stringify(site, null, 2) + '\n' });
+    busy(true, 'Saving…');
+    const newTree = await gh(`${repoPath()}/git/trees`, { method: 'POST', body: { base_tree: commit.tree.sha, tree } });
+    const newCommit = await gh(`${repoPath()}/git/commits`, { method: 'POST', body: { message: 'Update portfolio from editor', tree: newTree.sha, parents: [head] } });
+    await gh(`${repoPath()}/git/refs/heads/${encodeURIComponent(conn.branch)}`, { method: 'PATCH', body: { sha: newCommit.sha } });
+    pending = {};
+    loadedPaths = refs;
+    dirty = false;
+    publishBtn.disabled = true;
+    setStatus('Published ✓ Live site updates in about a minute.', 'ok');
+  } catch (e) {
+    setStatus('Publish failed: ' + e.message, 'err');
+  } finally { busy(false); }
+}
+
+function validate() {
+  const p = [];
+  if (site.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(site.email.trim())) p.push('The email address looks wrong, so the Contact button will be hidden.');
+  for (const k of ['instagram', 'artstation']) if (site.social[k] && !/^https:\/\//.test(site.social[k])) p.push(`The ${k} link should start with https://`);
+  for (const g of site.galleries) if (!g.images.length) p.push(`Gallery "${g.title}" has no images.`);
+  return p;
+}
+
+// ---------- images ----------
+function readAsDataURL(blob) {
+  return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
+}
+async function resizeTo(bitmap, scale, type, q) {
+  const w = Math.max(1, Math.round(bitmap.width * scale)), h = Math.max(1, Math.round(bitmap.height * scale));
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  if (type === 'image/jpeg') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h); }
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(bitmap, 0, 0, w, h);
+  const blob = await new Promise(r => c.toBlob(r, type, q));
+  return readAsDataURL(blob);
+}
+function hasAlpha(bitmap) {
+  const s = Math.min(1, 64 / Math.max(bitmap.width, bitmap.height));
+  const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(bitmap.width * s)); c.height = Math.max(1, Math.round(bitmap.height * s));
+  const ctx = c.getContext('2d'); ctx.drawImage(bitmap, 0, 0, c.width, c.height);
+  const d = ctx.getImageData(0, 0, c.width, c.height).data;
+  for (let i = 3; i < d.length; i += 4) if (d[i] < 250) return true;
+  return false;
+}
+function addPending(path, dataUrl) {
+  pending[path] = dataUrl.slice(dataUrl.indexOf(',') + 1);
+  previewFiles[path] = dataUrl;
+}
+// Returns {src, thumb, w, h}: a full-size image for the lightbox and a smaller one for the grid.
+async function processImage(file, prefix) {
+  const base = 'images/' + slug(prefix || titleFromFile(file.name)) + '-' + rand();
+  const ext = (file.name.match(/\.([a-z0-9]+)$/i) || [, 'img'])[1].toLowerCase();
+  if (file.type === 'image/gif' || file.type === 'image/svg+xml') {     // keep animation / vectors as-is
+    const url = await readAsDataURL(file);
+    const dims = await new Promise(r => { const i = new Image(); i.onload = () => r([i.naturalWidth || 1200, i.naturalHeight || 1200]); i.onerror = () => r([1200, 1200]); i.src = url; });
+    const p = `${base}.${ext}`;
+    addPending(p, url);
+    return { src: p, thumb: p, w: dims[0], h: dims[1] };
+  }
+  const bmp = await createImageBitmap(file);
+  const alpha = file.type === 'image/png' || file.type === 'image/webp' ? hasAlpha(bmp) : false;
+  const type = alpha ? 'image/png' : 'image/jpeg', e = alpha ? 'png' : 'jpg';
+  const long = Math.max(bmp.width, bmp.height), short = Math.min(bmp.width, bmp.height);
+  const full = await resizeTo(bmp, Math.min(1, FULL_MAX / long), type, 0.9);
+  const thumb = await resizeTo(bmp, Math.min(1, THUMB_SHORT / short), type, 0.82);
+  const out = { src: `${base}.${e}`, thumb: `images/thumbs/${base.slice(7)}.${e}`, w: bmp.width, h: bmp.height };
+  bmp.close && bmp.close();
+  addPending(out.src, full);
+  addPending(out.thumb, thumb);
+  return out;
+}
+async function addFiles(g, files) {
+  const list = [...files].filter(f => /^image\//.test(f.type));
+  if (!list.length) { setStatus('Those files are not images', 'err'); return; }
+  let n = 0;
+  for (const f of list) {
+    busy(true, `Preparing images… ${++n}/${list.length}`);
+    try {
+      const im = await processImage(f);
+      g.images.push({ ...im, title: titleFromFile(f.name), caption: '' });
+    } catch (e) { setStatus(`Could not read ${f.name}: ${e.message}`, 'err'); }
+  }
+  busy(false);
+  if (!g.cover && g.images[0]) g.cover = g.images[0].thumb || g.images[0].src;
+  renderPanel();
+  changed();
+  previewGo('#/' + encodeURIComponent(g.id));
+}
+
+// ---------- panel ----------
+const openState = { conn: true, site: true };
+function section(key, title, hint, ...body) {
+  const d = el('details', { 'data-key': key }, el('summary', {}, title, hint ? el('span', { class: 'hint' }, hint) : null), el('div', { class: 'sec' }, body));
+  d.open = !!openState[key];
+  d.addEventListener('toggle', () => { openState[key] = d.open; });
+  return d;
+}
+function field(label, input, note) { return el('label', {}, el('span', {}, label), input, note ? el('p', { class: 'note' }, note) : null); }
+function text(obj, key, attrs = {}) {
+  return el(attrs.multiline ? 'textarea' : 'input', {
+    type: attrs.multiline ? null : (attrs.type || 'text'), value: obj[key] || '', placeholder: attrs.placeholder || null,
+    oninput: e => { obj[key] = e.target.value; changed(); },
+    onchange: attrs.onchange || null
+  });
+}
+function select(obj, key, options, after) {
+  const s = el('select', { onchange: e => { obj[key] = isNaN(+e.target.value) || key === 'aspect' || key === 'tileAspect' ? e.target.value : +e.target.value; changed(); after && after(); } },
+    options.map(([v, l]) => el('option', { value: v }, l)));
+  s.value = String(obj[key]);
+  return s;
+}
+function socialUrl(kind, v) {
+  v = String(v || '').trim();
+  if (!v) return '';
+  if (/^https?:\/\//i.test(v)) return v.replace(/^http:/i, 'https:');
+  if (/^(www\.)?(instagram|artstation)\.com\//i.test(v)) return 'https://' + v;
+  const h = encodeURIComponent(v.replace(/^@/, '').replace(/\/+$/, ''));
+  return kind === 'instagram' ? `https://www.instagram.com/${h}/` : `https://www.artstation.com/${h}`;
+}
+
+function renderPanel() {
+  const y = panel.scrollTop;
+  panel.replaceChildren(...[
+    connSection(),
+    !site ? el('p', { class: 'note', style: 'padding:18px' }, 'Loading site…') : [
+      section('site', 'Name & contact', null,
+        field('Your name', text(site, 'name')),
+        field('Tagline', text(site, 'tagline', { placeholder: 'Illustrator & concept artist' }), 'Shown under your name in the sidebar layout, and to search engines.'),
+        field('Email', text(site, 'email', { type: 'email', placeholder: 'you@example.com' }), 'Used for the "Email me" button on the Contact page. It is visible to anyone, including spam bots.'),
+        field('Contact page text', text(site, 'contactText', { multiline: true })),
+        field('Instagram', socialInput('instagram'), 'Paste your profile link or just your @handle. Leave empty to hide.'),
+        field('ArtStation', socialInput('artstation'))
+      ),
+      section('look', 'Look', null,
+        field('Menu position', select(site.theme, 'nav', [['top', 'Top (like Derek Charm)'], ['sidebar', 'Left sidebar (like Gloria Félix)']])),
+        el('div', { class: 'row' },
+          field('Colors', select(site.theme, 'mode', [['light', 'Light'], ['dark', 'Dark']])),
+          field('Accent', el('input', { type: 'color', value: site.theme.accent || '#111111', style: 'width:100%;height:34px;padding:2px;border:1px solid var(--line);border-radius:6px', oninput: e => { site.theme.accent = e.target.value; changed(); } }))),
+        el('div', { class: 'row' },
+          field('Heading font', select(site.theme, 'headingFont', FONTS.map(f => [f, f]))),
+          field('Body font', select(site.theme, 'bodyFont', FONTS.map(f => [f, f])))),
+        field(`Space between images: ${site.theme.gap}px`, el('input', { type: 'range', min: 0, max: 40, value: site.theme.gap, style: 'width:100%',
+          oninput: e => { site.theme.gap = +e.target.value; e.target.previousSibling.textContent = `Space between images: ${site.theme.gap}px`; changed(); } }))
+      ),
+      section('home', 'Home page', null,
+        field('Home shows', select(site.home, 'style', [['categories', 'Category tiles (one per gallery)'], ['first', 'The first gallery']], () => renderPanel())),
+        site.home.style === 'categories' ? [
+          field('Menu label for home', text(site.home, 'label', { placeholder: 'Work' })),
+          field('Tile shape', select(site.home, 'tileAspect', TILE_ASPECTS)),
+          el('p', { class: 'note' }, 'Each tile uses the gallery\'s cover image. Set a cover with the ★ next to an image.')
+        ] : null,
+        field('Intro text (optional)', text(site.home, 'intro', { multiline: true, placeholder: 'A short line shown big and centered above your work.' }))
+      ),
+      section('about', 'About page', null,
+        field('About text', text(site, 'about', { multiline: true }), 'Leave an empty line between paragraphs.'),
+        aboutImage()
+      ),
+      section('gals', 'Galleries', `${site.galleries.length}`,
+        site.galleries.map((g, i) => galleryCard(g, i)),
+        el('button', { class: 'btn add-gal', type: 'button', onclick: addGallery }, '+ Add gallery')
+      )
+    ]
+  ].flat(Infinity));
+  panel.scrollTop = y;
+}
+
+function socialInput(kind) {
+  return el('input', { type: 'text', value: site.social[kind] || '', placeholder: kind === 'instagram' ? '@yourname' : 'yourname',
+    oninput: e => { site.social[kind] = e.target.value.trim(); changed(); },
+    onchange: e => { site.social[kind] = socialUrl(kind, e.target.value); e.target.value = site.social[kind]; changed(); } });
+}
+
+function aboutImage() {
+  const input = el('input', { type: 'file', accept: 'image/*', hidden: true, onchange: async e => {
+    const f = e.target.files[0]; if (!f) return;
+    busy(true, 'Preparing photo…');
+    try { const im = await processImage(f, 'about'); site.aboutImage = im.src; changed(); renderPanel(); }
+    catch (err) { setStatus('Could not read that image: ' + err.message, 'err'); }
+    finally { busy(false); }
+  } });
+  return el('div', {}, el('span', { class: 'note', style: 'display:block;margin-top:12px' }, 'Photo (optional)'),
+    el('div', { class: 'about-img' },
+      site.aboutImage ? el('img', { src: previewSrc(site.aboutImage), alt: '' }) : null,
+      el('button', { class: 'btn small', type: 'button', onclick: () => input.click() }, site.aboutImage ? 'Replace' : 'Upload photo'),
+      site.aboutImage ? el('button', { class: 'btn small danger', type: 'button', onclick: () => { site.aboutImage = ''; changed(); renderPanel(); } }, 'Remove') : null,
+      input));
+}
+
+function connSection() {
+  const inp = (key, attrs) => el('input', Object.assign({ type: 'text', value: conn[key] || '',
+    oninput: e => { conn[key] = e.target.value.trim(); conn.ok = false; } }, attrs));
+  return section('conn', 'GitHub connection', conn.ok ? 'connected ✓' : 'needed to publish',
+    el('div', { class: 'row' }, field('Owner', inp('owner', { placeholder: 'amarii-ship-it' })), field('Repo', inp('repo', { placeholder: 'WEBmake' }))),
+    el('div', { class: 'row' }, field('Branch', inp('branch', { placeholder: 'main' })), el('span')),
+    field('Access token', inp('token', { type: 'password', autocomplete: 'off', placeholder: 'github_pat_…' }),
+      el('span', {}, 'A fine-grained token with Contents: Read and write on this repo only. ',
+        el('a', { href: 'https://github.com/settings/personal-access-tokens/new', target: '_blank', rel: 'noopener' }, 'Create one'), '. See README for steps.')),
+    el('label', { class: 'check' }, el('input', { type: 'checkbox', checked: conn.remember, onchange: e => { conn.remember = e.target.checked; if (conn.ok) store('token', conn.token, conn.remember); else if (!conn.remember) store('token', null); } }),
+      'Remember token on this device'),
+    el('p', { class: 'note' }, 'Unchecked: the token is forgotten when you close this tab. Only check this on your own computer.'),
+    el('div', { style: 'margin-top:12px' }, el('button', { class: 'btn', type: 'button', onclick: connect }, conn.ok ? 'Reconnect & reload' : 'Connect'))
+  );
+}
+
+function galleryCard(g, i) {
+  const n = site.galleries.length;
+  const move = d => { const j = i + d; [site.galleries[i], site.galleries[j]] = [site.galleries[j], site.galleries[i]]; renderPanel(); changed(); };
+  const fileIn = el('input', { type: 'file', accept: 'image/*', multiple: true, hidden: true, onchange: e => { addFiles(g, e.target.files); e.target.value = ''; } });
+  const drop = el('div', { class: 'drop', role: 'button', tabindex: '0',
+    onclick: () => fileIn.click(), onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileIn.click(); } },
+    ondragover: e => { if ([...e.dataTransfer.types].includes('Files')) { e.preventDefault(); drop.classList.add('over'); } },
+    ondragleave: () => drop.classList.remove('over'),
+    ondrop: e => { e.preventDefault(); drop.classList.remove('over'); addFiles(g, e.dataTransfer.files); } },
+    'Drop images here or click to upload', fileIn);
+  const card = el('div', { class: 'gal', onfocusin: () => previewGo('#/' + encodeURIComponent(g.id)) },
+    el('div', { class: 'gal-head' },
+      el('strong', {}, g.title || g.id),
+      el('button', { class: 'icon-btn', type: 'button', title: 'Move up', 'aria-label': 'Move gallery up', disabled: i === 0 ? true : null, onclick: () => move(-1) }, '↑'),
+      el('button', { class: 'icon-btn', type: 'button', title: 'Move down', 'aria-label': 'Move gallery down', disabled: i === n - 1 ? true : null, onclick: () => move(1) }, '↓'),
+      el('button', { class: 'icon-btn', type: 'button', title: 'Delete gallery', 'aria-label': 'Delete gallery', onclick: () => {
+        if (!confirm(`Delete the gallery "${g.title}" and its ${g.images.length} images?`)) return;
+        site.galleries.splice(i, 1); renderPanel(); changed();
+      } }, '✕')),
+    el('div', { class: 'gal-body' },
+      field('Title', el('input', { type: 'text', value: g.title || '', oninput: e => { g.title = e.target.value; card.querySelector('.gal-head strong').textContent = g.title || g.id; changed(); } }),
+        `Page address: …/#/${g.id}`),
+      field('Description (optional)', text(g, 'description', { placeholder: 'Shown above the images when filled in' })),
+      el('label', { class: 'check' }, el('input', { type: 'checkbox', checked: g.showInNav !== false, onchange: e => { g.showInNav = e.target.checked; changed(); } }), 'Show in menu'),
+      el('div', { class: 'row' },
+        field('Layout', select(g, 'layout', [['grid', 'Grid (cropped)'], ['masonry', 'Masonry (uncropped)']], () => renderPanel())),
+        field('Columns', select(g, 'columns', [[2, '2'], [3, '3'], [4, '4'], [5, '5']]))),
+      g.layout === 'grid' ? field('Thumbnail shape', select(g, 'aspect', ASPECTS)) : null,
+      drop,
+      imageList(g)
+    ));
+  return card;
+}
+
+let dragFrom = null;
+function imageList(g) {
+  const ul = el('ul', { class: 'imgs' });
+  g.images.forEach((im, i) => {
+    const isCover = g.cover && (g.cover === im.thumb || g.cover === im.src);
+    const move = d => { const j = i + d; if (j < 0 || j >= g.images.length) return; [g.images[i], g.images[j]] = [g.images[j], g.images[i]]; renderPanel(); changed(); };
+    const li = el('li', { class: 'img-row', draggable: 'true',
+      ondragstart: e => { dragFrom = { g, i }; li.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(i)); },
+      ondragend: () => { li.classList.remove('dragging'); dragFrom = null; ul.querySelectorAll('.drop-before').forEach(x => x.classList.remove('drop-before')); },
+      ondragover: e => { if (dragFrom && dragFrom.g === g) { e.preventDefault(); li.classList.add('drop-before'); } },
+      ondragleave: () => li.classList.remove('drop-before'),
+      ondrop: e => {
+        if (!dragFrom || dragFrom.g !== g) return;
+        e.preventDefault();
+        const [it] = g.images.splice(dragFrom.i, 1);
+        g.images.splice(dragFrom.i < i ? i - 1 : i, 0, it);
+        dragFrom = null; renderPanel(); changed();
+      } },
+      el('span', { class: 'handle', title: 'Drag to reorder', 'aria-hidden': 'true' }, '⋮⋮'),
+      el('img', { src: previewSrc(im.thumb || im.src), alt: '' }),
+      el('div', { class: 'fields' },
+        el('input', { type: 'text', value: im.title || '', placeholder: 'Title', 'aria-label': 'Image title', oninput: e => { im.title = e.target.value; changed(); } }),
+        el('input', { type: 'text', value: im.caption || '', placeholder: 'Caption (optional)', 'aria-label': 'Image caption', oninput: e => { im.caption = e.target.value; changed(); } })),
+      el('div', { class: 'acts' },
+        el('button', { class: 'icon-btn' + (isCover ? ' on' : ''), type: 'button', title: isCover ? 'Cover image' : 'Use as cover', 'aria-label': 'Use as cover', 'aria-pressed': String(!!isCover),
+          onclick: () => { g.cover = im.thumb || im.src; renderPanel(); changed(); } }, isCover ? '★' : '☆'),
+        el('button', { class: 'icon-btn', type: 'button', title: 'Move up', 'aria-label': 'Move image up', onclick: () => move(-1) }, '↑'),
+        el('button', { class: 'icon-btn', type: 'button', title: 'Move down', 'aria-label': 'Move image down', onclick: () => move(1) }, '↓'),
+        el('button', { class: 'icon-btn', type: 'button', title: 'Remove', 'aria-label': 'Remove image', onclick: () => {
+          g.images.splice(i, 1);
+          if (isCover) g.cover = g.images[0] ? (g.images[0].thumb || g.images[0].src) : '';
+          renderPanel(); changed();
+        } }, '✕')));
+    ul.append(li);
+  });
+  return ul;
+}
+
+function addGallery() {
+  const title = prompt('Gallery name', 'New gallery');
+  if (!title) return;
+  let id = slug(title), k = 2;
+  const taken = new Set(site.galleries.map(g => g.id).concat(['about', 'contact']));
+  while (taken.has(id)) id = slug(title) + '-' + k++;
+  site.galleries.push({ id, title, description: '', cover: '', showInNav: true, layout: 'grid', aspect: '1/1', columns: 3, images: [] });
+  openState.gals = true;
+  renderPanel();
+  changed();
+  previewGo('#/' + id);
+}
+
+function setSite(d) {
+  site = normalize(d);
+  pending = {};
+  loadedPaths = referencedPaths(site);
+  dirty = false;
+  publishBtn.disabled = true;
+  renderPanel();
+  sendPreview();
+}
+
+// ---------- top bar ----------
+publishBtn.addEventListener('click', publish);
+$('moreBtn').addEventListener('click', e => {
+  const l = $('moreList'); l.hidden = !l.hidden; e.currentTarget.setAttribute('aria-expanded', String(!l.hidden));
+});
+document.addEventListener('click', e => { if (!e.target.closest('.menu')) $('moreList').hidden = true; });
+$('openSite').addEventListener('click', () => window.open('./', '_blank'));
+$('dlJson').addEventListener('click', () => {
+  const a = el('a', { href: URL.createObjectURL(new Blob([JSON.stringify(site, null, 2)], { type: 'application/json' })), download: 'site.json' });
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+$('importJson').addEventListener('click', () => $('importFile').click());
+$('importFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try { const d = JSON.parse(await f.text()); site = normalize(d); renderPanel(); changed(); setStatus('Imported. Publish to make it live.'); }
+  catch (err) { setStatus('That file is not valid site.json', 'err'); }
+  e.target.value = '';
+});
+$('reload').addEventListener('click', () => {
+  if (dirty && !confirm('Discard all unpublished changes?')) return;
+  dirty = false;
+  conn.ok && conn.token ? connect() : boot();
+});
+const setPv = phone => {
+  $('stage').classList.toggle('phone', phone);
+  $('pvDesk').setAttribute('aria-pressed', String(!phone));
+  $('pvPhone').setAttribute('aria-pressed', String(phone));
+};
+$('pvDesk').addEventListener('click', () => setPv(false));
+$('pvPhone').addEventListener('click', () => setPv(true));
+$('pvToggle').addEventListener('click', () => {
+  const on = document.body.classList.toggle('show-preview');
+  $('pvToggle').textContent = on ? 'Edit' : 'Preview';
+  if (on) sendPreview();
+});
+
+// ---------- boot ----------
+async function boot() {
+  renderPanel();
+  if (conn.token && conn.owner && conn.repo) { await connect(); if (conn.ok) return; }
+  try {
+    const r = await fetch('site.json', { cache: 'no-cache' });
+    setSite(await r.json());
+    setStatus(conn.ok ? 'Connected' : 'Editing. Connect GitHub to publish.');
+  } catch (e) {
+    setSite({ name: 'Your Name', galleries: [] });
+    setStatus('No site.json found; starting fresh.');
+  }
+}
+boot();
+})();
+</script>
+</body>
+</html>

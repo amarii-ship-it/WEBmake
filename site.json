@@ -1,0 +1,80 @@
+{
+  "name": "Your Name",
+  "tagline": "Illustrator & concept artist",
+  "email": "you@example.com",
+  "social": {
+    "instagram": "https://www.instagram.com/",
+    "artstation": "https://www.artstation.com/"
+  },
+  "home": {
+    "style": "categories",
+    "label": "Work",
+    "intro": "",
+    "tileAspect": "12/5"
+  },
+  "about": "Write a few lines about yourself here.\n\nWho you've worked with, what you make, and what kind of work you're open to.",
+  "aboutImage": "",
+  "contactText": "For commissions and freelance inquiries, email me.",
+  "theme": {
+    "mode": "light",
+    "nav": "top",
+    "accent": "#111111",
+    "headingFont": "Bebas Neue",
+    "bodyFont": "Inter",
+    "gap": 14
+  },
+  "galleries": [
+    {
+      "id": "illustration",
+      "title": "Illustration",
+      "description": "",
+      "cover": "images/sample-2.svg",
+      "showInNav": true,
+      "layout": "grid",
+      "aspect": "1/1",
+      "columns": 4,
+      "images": [
+        { "src": "images/sample-1.svg", "thumb": "images/sample-1.svg", "title": "Sample 1", "caption": "Replace these with your own work in the editor.", "w": 1200, "h": 1500 },
+        { "src": "images/sample-2.svg", "thumb": "images/sample-2.svg", "title": "Sample 2", "caption": "", "w": 1600, "h": 1000 },
+        { "src": "images/sample-3.svg", "thumb": "images/sample-3.svg", "title": "Sample 3", "caption": "", "w": 1200, "h": 1200 },
+        { "src": "images/sample-4.svg", "thumb": "images/sample-4.svg", "title": "Sample 4", "caption": "", "w": 1000, "h": 1500 },
+        { "src": "images/sample-5.svg", "thumb": "images/sample-5.svg", "title": "Sample 5", "caption": "", "w": 1600, "h": 900 },
+        { "src": "images/sample-6.svg", "thumb": "images/sample-6.svg", "title": "Sample 6", "caption": "", "w": 1200, "h": 1600 },
+        { "src": "images/sample-7.svg", "thumb": "images/sample-7.svg", "title": "Sample 7", "caption": "", "w": 1500, "h": 1100 },
+        { "src": "images/sample-8.svg", "thumb": "images/sample-8.svg", "title": "Sample 8", "caption": "", "w": 1200, "h": 1200 }
+      ]
+    },
+    {
+      "id": "comics",
+      "title": "Comics",
+      "description": "",
+      "cover": "images/sample-6.svg",
+      "showInNav": true,
+      "layout": "grid",
+      "aspect": "2/3",
+      "columns": 3,
+      "images": [
+        { "src": "images/sample-6.svg", "thumb": "images/sample-6.svg", "title": "Sample 6", "caption": "", "w": 1200, "h": 1600 },
+        { "src": "images/sample-4.svg", "thumb": "images/sample-4.svg", "title": "Sample 4", "caption": "", "w": 1000, "h": 1500 },
+        { "src": "images/sample-9.svg", "thumb": "images/sample-9.svg", "title": "Sample 9", "caption": "", "w": 1000, "h": 1400 }
+      ]
+    },
+    {
+      "id": "sketches",
+      "title": "Sketches",
+      "description": "Studies and sketchbook pages.",
+      "cover": "images/sample-5.svg",
+      "showInNav": true,
+      "layout": "masonry",
+      "aspect": "1/1",
+      "columns": 3,
+      "images": [
+        { "src": "images/sample-7.svg", "thumb": "images/sample-7.svg", "title": "Sample 7", "caption": "", "w": 1500, "h": 1100 },
+        { "src": "images/sample-8.svg", "thumb": "images/sample-8.svg", "title": "Sample 8", "caption": "", "w": 1200, "h": 1200 },
+        { "src": "images/sample-9.svg", "thumb": "images/sample-9.svg", "title": "Sample 9", "caption": "", "w": 1000, "h": 1400 },
+        { "src": "images/sample-1.svg", "thumb": "images/sample-1.svg", "title": "Sample 1", "caption": "", "w": 1200, "h": 1500 },
+        { "src": "images/sample-5.svg", "thumb": "images/sample-5.svg", "title": "Sample 5", "caption": "", "w": 1600, "h": 900 }
+      ]
+    }
+  ]
+}
