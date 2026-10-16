@@ -57,8 +57,36 @@ async function siteTests(browser) {
   await page.waitForSelector('.contact');
   check(await page.getAttribute('.contact .btn', 'href') === 'mailto:you@example.com', 'contact has mailto button');
   check(await page.locator('.contact .icons a').count() === 2, 'contact lists both socials');
+  // Fluid grid: same proportions at any desktop width, separate phone arrangement.
+  const frac = () => page.evaluate(() => {
+    const g = document.querySelector('.fgrid').getBoundingClientRect();
+    return [...document.querySelectorAll('.fgrid > .fb')].map(n => {
+      const r = n.getBoundingClientRect();
+      return [(r.left - g.left) / g.width, r.width / g.width, (r.top - g.top) / g.width];
+    });
+  });
   await page.goto(BASE + '#/about');
-  check(await page.locator('.about h1').textContent() === 'About', 'about page renders');
+  await page.waitForSelector('.fgrid > .fb');
+  check(await page.locator('.fgrid > .fb').count() === 5, 'about page has 5 grid blocks');
+  const wide = await frac();
+  await page.setViewportSize({ width: 950, height: 900 });
+  await page.waitForTimeout(150);
+  const narrow = await frac();
+  const same = wide.every((r, i) => r.slice(0, 2).every((v, k) => Math.abs(v - narrow[i][k]) < 0.01));
+  check(same, 'blocks keep the same horizontal proportions at 1400px and 950px');
+  check(Math.abs(wide[0][2] - narrow[0][2]) < 0.01 && Math.abs(wide[2][2] - narrow[2][2]) < 0.02, 'and the same vertical proportions');
+  check(await page.locator('.fb-btn .btn').evaluate(a => getComputedStyle(a).backgroundColor) !== 'rgba(0, 0, 0, 0)', 'grid button is visible');
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.waitForTimeout(150);
+  const cols = await page.locator('.fgrid').evaluate(g => getComputedStyle(g).gridTemplateColumns.split(' ').length);
+  check(cols === 8, 'phone switches to 8 columns');
+  const stacked = await page.evaluate(() => {
+    const rs = [...document.querySelectorAll('.fgrid > .fb')].map(n => n.getBoundingClientRect());
+    return rs.every((r, i) => i === 0 || r.top >= rs[i - 1].bottom - 1);
+  });
+  check(stacked, 'phone stacks blocks top to bottom without overlap');
+  check(!(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)), 'grid page has no sideways scroll on phone');
+  await page.setViewportSize({ width: 1400, height: 900 });
 
   // Content is data: script-looking text must render as text, bad links must be dropped.
   await page.evaluate(() => fetch('site.json').then(r => r.json()).then(d => {
@@ -154,6 +182,68 @@ async function editorTests(browser) {
   await ig.blur();
   check((await ig.inputValue()) === 'https://www.instagram.com/ada.draws/', 'instagram handle becomes a link');
 
+  // Grid layout editing on the About page
+  await page.click('details[data-key=layout] > summary');
+  await page.selectOption('details[data-key=layout] select', 'about');
+  await page.waitForTimeout(400);
+  const bio = frame.locator('.fb[data-id=b-bio]');
+  await bio.click();
+  await page.waitForSelector('.blk.sel');
+  check(await page.locator('.blk-edit textarea').count() === 1, 'clicking a block in the preview opens its settings');
+  await page.locator('.blk-edit textarea').fill('I draw dragons.');
+  await page.waitForTimeout(300);
+  check((await bio.textContent()).includes('I draw dragons.'), 'editing text updates the preview');
+
+  const gbox = await frame.locator('.fgrid').boundingBox();
+  const colW = gbox.width / 24;
+  let bb = await bio.boundingBox();
+  await page.mouse.move(bb.x + 30, bb.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(bb.x + 30 + colW, bb.y + 20, { steps: 4 });
+  await page.mouse.move(bb.x + 30 + colW * 2, bb.y + 20 + colW, { steps: 4 });
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  check((await bio.evaluate(n => n.style.getPropertyValue('--dc'))) === '15 / span 10', 'drag moves block 2 columns right');
+  check((await bio.evaluate(n => n.style.getPropertyValue('--dr'))) === '5 / span 5', 'and 1 row down');
+
+  bb = await bio.boundingBox();
+  const h = frame.locator('.fb[data-id=b-bio] .fb-h');
+  const hb = await h.boundingBox();
+  await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(hb.x - colW * 3, hb.y + hb.height / 2, { steps: 5 });
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  check((await bio.evaluate(n => n.style.getPropertyValue('--dc'))) === '15 / span 7', 'corner drag resizes width');
+
+  await bio.click();
+  await page.keyboard.press('ArrowLeft');
+  await page.waitForTimeout(250);
+  check((await bio.evaluate(n => n.style.getPropertyValue('--dc'))) === '14 / span 7', 'arrow key nudges block');
+
+  // Phone arrangement is separate
+  await page.click('#pvPhone');
+  await page.waitForTimeout(500);
+  const photo = frame.locator('.fb[data-id=b-photo]');
+  const pb = await photo.boundingBox();
+  const pcol = (await frame.locator('.fgrid').boundingBox()).width / 8;
+  await photo.click();
+  await page.mouse.move(pb.x + pb.width - 7, pb.y + pb.height - 7);   // resize from the corner square
+  await page.mouse.down();
+  await page.mouse.move(pb.x + pb.width - 7 - pcol * 2, pb.y + pb.height - 7, { steps: 5 });
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  check((await photo.evaluate(n => n.style.getPropertyValue('--mc'))) === '1 / span 6', 'phone layout resized separately');
+  check((await bio.evaluate(n => n.style.getPropertyValue('--dc'))) === '14 / span 7', 'desktop layout untouched by phone edit');
+  await page.click('#pvDesk');
+  await page.waitForTimeout(300);
+  check(await page.getByRole('button', { name: 'Reset phone layout to automatic' }).count() === 1, 'reset phone layout offered');
+
+  // Add a text block
+  await page.locator('.sec-card').first().getByRole('button', { name: '+ Text' }).click();
+  await page.waitForTimeout(300);
+  check(await frame.locator('.fgrid > .fb').count() === 6, 'new text block appears in preview');
+
   // Upload a PNG to the first gallery
   await page.click('details[data-key=gals] > summary');
   const png = await page.evaluate(() => {
@@ -192,6 +282,11 @@ async function editorTests(browser) {
   check(commit.parents[0] === 'head1' && commit.tree === 'tree2', 'commit points at new tree with current head as parent');
   check(calls.some(c => c.method === 'PATCH' && c.path.endsWith('/git/refs/heads/main') && c.body.sha === 'commit2'), 'branch moved to new commit');
   check(await page.isDisabled('#publish'), 'publish disabled again after publishing');
+  const about = saved.pages.find(p => p.id === 'about').sections[0];
+  const sb = about.blocks.find(b => b.id === 'b-bio');
+  check(sb.text === 'I draw dragons.' && sb.d.x === 13 && sb.d.w === 7 && sb.d.y === 4, 'grid edits saved: ' + JSON.stringify(sb.d));
+  check(about.blocks.find(b => b.id === 'b-photo').m.w === 6 && about.blocks.every(b => b.m || b.type === 'text' && b.text === 'New text'), 'phone layout saved for every block');
+  check(about.blocks.length === 6, 'new block saved');
 
   // Add gallery
   await page.getByRole('button', { name: '+ Add gallery' }).click();

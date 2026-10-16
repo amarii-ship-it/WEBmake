@@ -79,6 +79,14 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .menu-list[hidden]{display:none}
 .menu-list button{display:block;width:100%;text-align:left;border:0;background:none;padding:8px 10px;border-radius:5px;cursor:pointer}
 .menu-list button:hover{background:var(--bg)}
+.sec-card{border:1px solid var(--line);border-radius:var(--r);margin:12px 0;background:#fcfcfb}
+.blk{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:1px solid var(--line);background:#fff;border-radius:6px;padding:7px 9px;cursor:pointer;margin-top:6px}
+.blk.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.blk small{color:var(--muted);flex:none;width:52px}
+.blk span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.blk-edit{border:1px solid var(--accent);border-top:0;border-radius:0 0 6px 6px;padding:4px 10px 12px;margin-top:-2px;background:#fff}
+.add-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.tip{background:#f2f5fd;border-radius:6px;padding:9px 11px;font-size:12.5px;color:#2d3a5c;margin:4px 0 6px}
 @media (max-width:900px){
   .wrap{flex-direction:column}
   .panel{width:auto;border-right:0;flex:1}
@@ -142,6 +150,7 @@ let previewFiles = {};      // path -> data URL so the preview can show new uplo
 let loadedPaths = new Set();// image paths referenced when we loaded (to clean up removed ones)
 let dirty = false;
 let previewReady = false;
+let sel = { page: 'home', section: null, block: null };   // what is selected in the layout editor
 
 // ---------- storage ----------
 function store(k, v, remember) {
@@ -196,6 +205,26 @@ function normalize(d) {
   d.home = Object.assign({ style: 'first', label: 'Work', intro: '', tileAspect: '12/5' }, d.home);
   d.theme = Object.assign({ mode: 'light', nav: 'top', accent: '#111111', headingFont: 'Inter', bodyFont: 'Inter', gap: 14 }, d.theme);
   d.galleries = Array.isArray(d.galleries) ? d.galleries : [];
+  d.pages = Array.isArray(d.pages) ? d.pages : [];
+  d.home.sections = Array.isArray(d.home.sections) ? d.home.sections : [];
+  for (const sec of [d.home, ...d.pages].flatMap(p => (p.sections = Array.isArray(p.sections) ? p.sections : []))) {
+    sec.blocks = (Array.isArray(sec.blocks) ? sec.blocks : []).filter(b => b && b.d);
+    sec.id = sec.id || 's' + rand();
+    sec.rows = sec.rows || 4;
+  }
+  // Old sites: turn the short intro text into a grid section so there is one way to edit it.
+  if (d.home.intro && !d.home.sections.length) {
+    d.home.sections.push({ id: 's' + rand(), rows: 3, bg: '', blocks: [{ id: 'b' + rand(), type: 'text', style: 'large', align: 'center', text: d.home.intro, d: { x: 3, y: 0, w: 18, h: 3 } }] });
+  }
+  delete d.home.intro;
+  // Old sites: move the plain About text onto a grid page.
+  if ((d.about || d.aboutImage) && !d.pages.some(p => p.id === 'about')) {
+    const blocks = [{ id: 'b' + rand(), type: 'text', style: 'h1', align: 'left', text: 'About', d: { x: d.aboutImage ? 12 : 1, y: 0, w: 11, h: 2 } },
+      { id: 'b' + rand(), type: 'text', style: 'body', align: 'left', text: d.about || '', d: { x: d.aboutImage ? 12 : 1, y: 2, w: 11, h: 6 } }];
+    if (d.aboutImage) blocks.unshift({ id: 'b' + rand(), type: 'image', src: d.aboutImage, alt: d.name || '', fit: 'cover', zoom: false, link: '', d: { x: 1, y: 0, w: 9, h: 12 } });
+    d.pages.unshift({ id: 'about', title: 'About', showInNav: true, sections: [{ id: 's' + rand(), rows: d.aboutImage ? 12 : 8, bg: '', blocks }] });
+  }
+  d.about = ''; d.aboutImage = '';
   for (const g of d.galleries) {
     g.images = Array.isArray(g.images) ? g.images : [];
     if (g.showInNav == null) g.showInNav = true;
@@ -209,6 +238,7 @@ function normalize(d) {
 function referencedPaths(d) {
   const s = new Set();
   if (d.aboutImage) s.add(d.aboutImage);
+  for (const p of [d.home || {}, ...(d.pages || [])]) for (const sec of p.sections || []) for (const b of sec.blocks || []) if (b.src) s.add(b.src);
   for (const g of d.galleries || []) {
     if (g.cover) s.add(g.cover);
     for (const im of g.images || []) { if (im.src) s.add(im.src); if (im.thumb) s.add(im.thumb); }
@@ -227,7 +257,7 @@ function changed() {
 }
 function sendPreview() {
   if (!previewReady || !site) return;
-  frame.contentWindow.postMessage({ type: 'webmake:data', site: JSON.parse(JSON.stringify(site)), files: previewFiles }, location.origin);
+  frame.contentWindow.postMessage({ type: 'webmake:data', site: JSON.parse(JSON.stringify(site)), files: previewFiles, edit: true, selected: sel.block }, location.origin);
 }
 function previewGo(hash) {
   try { if (frame.contentWindow.location.hash !== hash) frame.contentWindow.location.hash = hash; } catch (e) {}
@@ -235,6 +265,38 @@ function previewGo(hash) {
 window.addEventListener('message', e => {
   if (e.origin !== location.origin || !e.data) return;
   if (e.data.type === 'webmake:ready') { previewReady = true; sendPreview(); }
+  if (!site) return;
+  if (e.data.type === 'webmake:select') {
+    const f = findSec(e.data.section);
+    if (!f) return;
+    sel = { page: f.page.id, section: f.sec.id, block: e.data.block || null };
+    openState.layout = true;
+    renderPanel();
+    const n = panel.querySelector('.blk.sel');
+    if (n) n.scrollIntoView({ block: 'nearest' });
+  }
+  if (e.data.type === 'webmake:layout') {
+    const f = findSec(e.data.section);
+    if (!f || !e.data.positions) return;
+    const cols = e.data.key === 'm' ? 8 : 24;
+    for (const b of f.sec.blocks) {
+      const r = e.data.positions[b.id];
+      if (!r) continue;
+      const x = Math.max(0, Math.min(cols - 1, r.x | 0));
+      b[e.data.key] = { x, y: Math.max(0, r.y | 0), w: Math.max(1, Math.min(cols - x, r.w | 0)), h: Math.max(1, r.h | 0) };
+    }
+    if (e.data.key === 'd') f.sec.rows = Math.max(1, ...f.sec.blocks.map(b => b.d.y + b.d.h));
+    changed();
+    renderPanel();
+  }
+  if (e.data.type === 'webmake:delete') {
+    const f = findSec(e.data.section);
+    if (!f) return;
+    f.sec.blocks = f.sec.blocks.filter(b => b.id !== e.data.block);
+    sel.block = null;
+    changed();
+    renderPanel();
+  }
 });
 window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
 
@@ -311,7 +373,7 @@ async function publish() {
       const have = new Set((existing.tree || []).map(t => t.path));
       for (const p of gone) if (have.has(p)) tree.push({ path: p, mode: '100644', type: 'blob', sha: null });
     }
-    tree.push({ path: 'site.json', mode: '100644', type: 'blob', content: JSON.stringify(site, null, 2) + '\n' });
+    tree.push({ path: 'site.json', mode: '100644', type: 'blob', content: JSON.stringify(site, (k, v) => k === 'fresh' ? undefined : v, 2) + '\n' });
     busy(true, 'Saving…');
     const newTree = await gh(`${repoPath()}/git/trees`, { method: 'POST', body: { base_tree: commit.tree.sha, tree } });
     const newCommit = await gh(`${repoPath()}/git/commits`, { method: 'POST', body: { message: 'Update portfolio from editor', tree: newTree.sha, parents: [head] } });
@@ -457,18 +519,14 @@ function renderPanel() {
           oninput: e => { site.theme.gap = +e.target.value; e.target.previousSibling.textContent = `Space between images: ${site.theme.gap}px`; changed(); } }))
       ),
       section('home', 'Home page', null,
-        field('Home shows', select(site.home, 'style', [['categories', 'Category tiles (one per gallery)'], ['first', 'The first gallery']], () => renderPanel())),
+        field('Below your sections, home shows', select(site.home, 'style', [['categories', 'Category tiles (one per gallery)'], ['first', 'The first gallery']], () => renderPanel())),
         site.home.style === 'categories' ? [
           field('Menu label for home', text(site.home, 'label', { placeholder: 'Work' })),
           field('Tile shape', select(site.home, 'tileAspect', TILE_ASPECTS)),
           el('p', { class: 'note' }, 'Each tile uses the gallery\'s cover image. Set a cover with the ★ next to an image.')
-        ] : null,
-        field('Intro text (optional)', text(site.home, 'intro', { multiline: true, placeholder: 'A short line shown big and centered above your work.' }))
+        ] : null
       ),
-      section('about', 'About page', null,
-        field('About text', text(site, 'about', { multiline: true }), 'Leave an empty line between paragraphs.'),
-        aboutImage()
-      ),
+      layoutSection(),
       section('gals', 'Galleries', `${site.galleries.length}`,
         site.galleries.map((g, i) => galleryCard(g, i)),
         el('button', { class: 'btn add-gal', type: 'button', onclick: addGallery }, '+ Add gallery')
@@ -484,20 +542,170 @@ function socialInput(kind) {
     onchange: e => { site.social[kind] = socialUrl(kind, e.target.value); e.target.value = site.social[kind]; changed(); } });
 }
 
-function aboutImage() {
-  const input = el('input', { type: 'file', accept: 'image/*', hidden: true, onchange: async e => {
-    const f = e.target.files[0]; if (!f) return;
-    busy(true, 'Preparing photo…');
-    try { const im = await processImage(f, 'about'); site.aboutImage = im.src; changed(); renderPanel(); }
-    catch (err) { setStatus('Could not read that image: ' + err.message, 'err'); }
-    finally { busy(false); }
-  } });
-  return el('div', {}, el('span', { class: 'note', style: 'display:block;margin-top:12px' }, 'Photo (optional)'),
-    el('div', { class: 'about-img' },
-      site.aboutImage ? el('img', { src: previewSrc(site.aboutImage), alt: '' }) : null,
-      el('button', { class: 'btn small', type: 'button', onclick: () => input.click() }, site.aboutImage ? 'Replace' : 'Upload photo'),
-      site.aboutImage ? el('button', { class: 'btn small danger', type: 'button', onclick: () => { site.aboutImage = ''; changed(); renderPanel(); } }, 'Remove') : null,
-      input));
+// ---------- pages & grid sections ----------
+const BLOCK_NAMES = { text: 'Text', image: 'Image', button: 'Button', social: 'Social' };
+function owners() { return [{ id: 'home', title: 'Home', sections: site.home.sections, isHome: true }, ...site.pages]; }
+function findSec(id) {
+  for (const p of owners()) { const s = (p.sections || []).find(x => x.id === id); if (s) return { page: p, sec: s }; }
+  return null;
+}
+function pageHash(p) { return p.isHome ? '#/' : '#/' + encodeURIComponent(p.id); }
+function selectedPage() { return owners().find(p => p.id === sel.page) || owners()[0]; }
+
+function layoutSection() {
+  const page = selectedPage();
+  if (page.isHome) page.sections = site.home.sections;
+  const pick = el('select', { onchange: e => { sel = { page: e.target.value, section: null, block: null }; renderPanel(); sendPreview(); previewGo(pageHash(selectedPage())); } },
+    owners().map(p => el('option', { value: p.id }, p.isHome ? 'Home page' : p.title || p.id)));
+  pick.value = page.id;
+  return section('layout', 'Pages & layout', `${site.pages.length + 1} pages`,
+    el('div', { class: 'tip' }, 'Click a block in the preview to select it. Drag it to move, drag its corner square to resize. Arrow keys nudge, Shift+arrows resize. Switch the preview to Phone to arrange the phone layout separately.'),
+    el('div', { class: 'row', style: 'align-items:flex-end' }, field('Page', pick), el('div', { style: 'flex:none' }, el('button', { class: 'btn', type: 'button', onclick: addPage }, '+ New page'))),
+    page.isHome ? null : [
+      field('Page title', el('input', { type: 'text', value: page.title || '', oninput: e => { page.title = e.target.value; changed(); } }), `Page address: …/#/${page.id}`),
+      el('label', { class: 'check' }, el('input', { type: 'checkbox', checked: page.showInNav !== false, onchange: e => { page.showInNav = e.target.checked; changed(); } }), 'Show in menu'),
+      el('div', { style: 'margin-top:8px' }, el('button', { class: 'btn small danger', type: 'button', onclick: () => {
+        if (!confirm(`Delete the page "${page.title}"?`)) return;
+        site.pages = site.pages.filter(p => p !== page); sel = { page: 'home', section: null, block: null }; renderPanel(); changed(); previewGo('#/');
+      } }, 'Delete page'))
+    ],
+    page.sections.map((sec, i) => sectionCard(page, sec, i)),
+    el('button', { class: 'btn add-gal', type: 'button', onclick: () => {
+      const sec = { id: 's' + rand(), rows: 6, bg: '', blocks: [] };
+      page.sections.push(sec); sel = { page: page.id, section: sec.id, block: null }; renderPanel(); changed(); previewGo(pageHash(page));
+    } }, '+ Add section')
+  );
+}
+
+function sectionCard(page, sec, i) {
+  const n = page.sections.length;
+  const move = d => { const j = i + d; [page.sections[i], page.sections[j]] = [page.sections[j], page.sections[i]]; renderPanel(); changed(); };
+  const hasBg = /^#/.test(sec.bg || '');
+  return el('div', { class: 'sec-card' },
+    el('div', { class: 'gal-head' },
+      el('strong', {}, `Section ${i + 1}`),
+      el('button', { class: 'icon-btn', type: 'button', title: 'Move up', 'aria-label': 'Move section up', disabled: i === 0 ? true : null, onclick: () => move(-1) }, '↑'),
+      el('button', { class: 'icon-btn', type: 'button', title: 'Move down', 'aria-label': 'Move section down', disabled: i === n - 1 ? true : null, onclick: () => move(1) }, '↓'),
+      el('button', { class: 'icon-btn', type: 'button', title: 'Delete section', 'aria-label': 'Delete section', onclick: () => {
+        if (sec.blocks.length && !confirm('Delete this section and its blocks?')) return;
+        page.sections.splice(i, 1); renderPanel(); changed();
+      } }, '✕')),
+    el('div', { class: 'gal-body' },
+      el('div', { class: 'row', style: 'align-items:flex-end' },
+        field('Height (rows)', el('input', { type: 'number', min: 1, max: 200, value: sec.rows, style: 'width:100%;border:1px solid var(--line);border-radius:6px;padding:6px 8px',
+          onchange: e => { const need = Math.max(1, ...sec.blocks.map(b => b.d.y + b.d.h)); sec.rows = Math.max(need, Math.min(200, +e.target.value || 1)); e.target.value = sec.rows; changed(); } })),
+        el('label', { class: 'check', style: 'margin-bottom:8px' },
+          el('input', { type: 'checkbox', checked: hasBg, onchange: e => { sec.bg = e.target.checked ? '#f1efe9' : ''; renderPanel(); changed(); } }), 'Background'),
+        hasBg ? el('input', { type: 'color', value: sec.bg, style: 'flex:none;width:40px;height:32px;padding:2px;border:1px solid var(--line);border-radius:6px;margin-bottom:2px',
+          oninput: e => { sec.bg = e.target.value; changed(); } }) : null),
+      el('div', { class: 'add-row' }, Object.keys(BLOCK_NAMES).map(t =>
+        el('button', { class: 'btn small', type: 'button', onclick: () => addBlock(page, sec, t) }, '+ ' + BLOCK_NAMES[t]))),
+      sec.blocks.map(b => blockRow(page, sec, b)),
+      sec.blocks.some(b => b.m) ? el('button', { class: 'btn small', type: 'button', style: 'margin-top:10px',
+        onclick: () => { sec.blocks.forEach(b => delete b.m); changed(); renderPanel(); } }, 'Reset phone layout to automatic') : null
+    ));
+}
+
+function blockLabel(b) {
+  if (b.type === 'text') return (b.text || '').split('\n')[0] || '(empty text)';
+  if (b.type === 'image') return b.alt || (b.src ? b.src.split('/').pop() : '(no image yet)');
+  if (b.type === 'button') return b.label || 'Button';
+  return 'Instagram / ArtStation icons';
+}
+function blockRow(page, sec, b) {
+  const on = sel.block === b.id;
+  const row = el('button', { class: 'blk' + (on ? ' sel' : ''), type: 'button', onclick: () => {
+    sel = { page: page.id, section: sec.id, block: on ? null : b.id }; renderPanel(); sendPreview(); previewGo(pageHash(page));
+  } }, el('small', {}, BLOCK_NAMES[b.type] || b.type), el('span', {}, blockLabel(b)));
+  return on ? [row, blockEditor(page, sec, b)] : row;
+}
+const ALIGN = [['left', 'Left'], ['center', 'Center'], ['right', 'Right']];
+function blockEditor(page, sec, b) {
+  const box = el('div', { class: 'blk-edit' });
+  const label = () => { const r = box.previousSibling; if (r) r.querySelector('span').textContent = blockLabel(b); };
+  const inp = (key, ph) => el('input', { type: 'text', value: b[key] || '', placeholder: ph || null, oninput: e => { b[key] = e.target.value; label(); changed(); } });
+  if (b.type === 'text') box.append(
+    field('Text', el('textarea', { value: b.text || '', oninput: e => { b.text = e.target.value; label(); changed(); } }), 'Leave an empty line between paragraphs.'),
+    el('div', { class: 'row' },
+      field('Style', select(b, 'style', [['hero', 'Huge heading'], ['h1', 'Heading'], ['h2', 'Subheading'], ['large', 'Large text'], ['body', 'Body'], ['small', 'Small']])),
+      field('Align', select(b, 'align', ALIGN))));
+  if (b.type === 'image') {
+    const fileIn = el('input', { type: 'file', accept: 'image/*', hidden: true, onchange: async e => {
+      const f = e.target.files[0]; if (!f) return;
+      busy(true, 'Preparing image…');
+      try {
+        const im = await processImage(f);
+        b.src = im.src;
+        if (!b.alt) b.alt = titleFromFile(f.name);
+        const d = b.d, ratio = im.h / im.w;                     // first upload: size the box to the picture
+        if (b.fresh) { d.h = Math.max(1, Math.round(d.w * ratio)); sec.rows = Math.max(sec.rows, d.y + d.h); delete b.fresh; }
+        changed(); renderPanel();
+      } catch (err) { setStatus('Could not read that image: ' + err.message, 'err'); }
+      finally { busy(false); e.target.value = ''; }
+    } });
+    box.append(
+      el('div', { class: 'about-img' }, b.src ? el('img', { src: previewSrc(b.src), alt: '' }) : null,
+        el('button', { class: 'btn small', type: 'button', onclick: () => fileIn.click() }, b.src ? 'Replace image' : 'Upload image'), fileIn),
+      field('Description', inp('alt', 'What the image shows'), 'Read aloud by screen readers; also used as the lightbox title.'),
+      el('div', { class: 'row' },
+        field('Fit', select(b, 'fit', [['cover', 'Fill box (crops)'], ['contain', 'Show whole image']])),
+        field('On click', zoomSelect(b))),
+      b.zoom ? null : field('Link (optional)', inp('link', '#/comics or https://…')));
+  }
+  if (b.type === 'button') box.append(
+    field('Label', inp('label', 'Get in touch')),
+    field('Link', inp('link', '#/contact, an email, or https://…'), 'Page links look like #/about. An email address opens the visitor\'s email app.'),
+    el('div', { class: 'row' },
+      field('Style', select(b, 'variant', [['solid', 'Solid'], ['outline', 'Outline']])),
+      field('Align', select(b, 'align', ALIGN))));
+  if (b.type === 'social') box.append(
+    el('p', { class: 'note' }, 'Shows your Instagram and ArtStation icons. Set the links under "Name & contact".'),
+    field('Align', select(b, 'align', ALIGN)));
+  box.append(el('div', { class: 'add-row' },
+    el('button', { class: 'btn small', type: 'button', onclick: () => { sec.blocks = sec.blocks.filter(x => x !== b).concat(b); renderPanel(); changed(); } }, 'Bring to front'),
+    el('button', { class: 'btn small danger', type: 'button', onclick: () => { sec.blocks = sec.blocks.filter(x => x !== b); sel.block = null; renderPanel(); changed(); } }, 'Delete block')));
+  return box;
+}
+
+function zoomSelect(b) {
+  const s = el('select', { onchange: e => { b.zoom = e.target.value === 'zoom'; changed(); renderPanel(); } },
+    el('option', { value: 'none' }, 'Nothing / link'), el('option', { value: 'zoom' }, 'Enlarge (lightbox)'));
+  s.value = b.zoom ? 'zoom' : 'none';
+  return s;
+}
+
+function addBlock(page, sec, type) {
+  const bottom = Math.max(0, ...sec.blocks.map(b => b.d.y + b.d.h));
+  const size = { text: [4, 16, 2], image: [7, 10, 8], button: [9, 6, 2], social: [9, 6, 2] }[type];
+  const b = { id: 'b' + rand(), type, d: { x: size[0], y: bottom, w: size[1], h: size[2] } };
+  if (type === 'text') Object.assign(b, { text: 'New text', style: 'body', align: 'left' });
+  if (type === 'image') Object.assign(b, { src: '', alt: '', fit: 'cover', zoom: false, link: '', fresh: true });
+  if (type === 'button') Object.assign(b, { label: 'Get in touch', link: '#/contact', variant: 'solid', align: 'center' });
+  if (type === 'social') Object.assign(b, { align: 'center' });
+  sec.blocks.push(b);
+  sec.rows = Math.max(sec.rows || 1, bottom + size[2]);
+  sel = { page: page.id, section: sec.id, block: b.id };
+  openState.layout = true;
+  renderPanel();
+  changed();
+  previewGo(pageHash(page));
+  if (type === 'image') { const f = panel.querySelector('.blk-edit input[type=file]'); if (f) f.click(); }
+}
+
+function addPage() {
+  const title = prompt('Page name', 'New page');
+  if (!title) return;
+  let id = slug(title), k = 2;
+  const taken = new Set(site.galleries.map(g => g.id).concat(site.pages.map(p => p.id), ['contact', 'home']));
+  while (taken.has(id)) id = slug(title) + '-' + k++;
+  const page = { id, title, showInNav: true, sections: [{ id: 's' + rand(), rows: 4, bg: '', blocks: [
+    { id: 'b' + rand(), type: 'text', style: 'h1', align: 'left', text: title, d: { x: 1, y: 0, w: 14, h: 2 } }] }] };
+  site.pages.push(page);
+  sel = { page: id, section: page.sections[0].id, block: null };
+  openState.layout = true;
+  renderPanel();
+  changed();
+  previewGo(pageHash(page));
 }
 
 function connSection() {
@@ -592,7 +800,7 @@ function addGallery() {
   const title = prompt('Gallery name', 'New gallery');
   if (!title) return;
   let id = slug(title), k = 2;
-  const taken = new Set(site.galleries.map(g => g.id).concat(['about', 'contact']));
+  const taken = new Set(site.galleries.map(g => g.id).concat(site.pages.map(p => p.id), ['about', 'contact', 'home']));
   while (taken.has(id)) id = slug(title) + '-' + k++;
   site.galleries.push({ id, title, description: '', cover: '', showInNav: true, layout: 'grid', aspect: '1/1', columns: 3, images: [] });
   openState.gals = true;

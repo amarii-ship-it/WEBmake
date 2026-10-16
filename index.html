@@ -96,6 +96,53 @@ main{flex:1;padding:0 var(--pad) 72px;min-width:0}
 .footer{padding:28px var(--pad) 36px;display:flex;justify-content:space-between;align-items:center;gap:16px;color:var(--muted);font-size:13px;border-top:1px solid var(--line)}
 .notice{max-width:560px;margin:80px auto;text-align:center;color:var(--muted)}
 
+/* ---------- free-layout sections (fluid grid) ----------
+   Desktop: 24 columns. Rows are as tall as a column is wide, so the whole
+   section scales with the page and keeps its arrangement. Rows can still grow
+   if text needs more room (minmax(..., auto)), so text never spills out.
+   Narrow containers switch to a separate 8-column phone arrangement. */
+.fsec{margin:0 0 clamp(32px,5vw,72px)}
+.fsec.bg{margin-left:calc(-1*var(--pad));margin-right:calc(-1*var(--pad));padding:clamp(28px,4vw,64px) var(--pad)}
+.fwrap{container-type:inline-size;max-width:1600px;margin:0 auto}
+.fgrid{--cols:24;--fgap:clamp(6px,.9cqw,16px);--row:calc((100cqw - (var(--cols) - 1) * var(--fgap)) / var(--cols));
+  display:grid;grid-template-columns:repeat(var(--cols),minmax(0,1fr));grid-template-rows:repeat(var(--rows,4),minmax(var(--row),auto));gap:var(--fgap);position:relative}
+.fgrid>.fb{grid-column:var(--dc);grid-row:var(--dr);z-index:var(--z,1);min-width:0;position:relative}
+@container (max-width:767px){
+  .fgrid{--cols:8;grid-template-rows:repeat(var(--mrows,4),minmax(var(--row),auto))}
+  .fgrid>.fb{grid-column:var(--mc);grid-row:var(--mr)}
+}
+.fb-text{display:flex;flex-direction:column;justify-content:flex-start;overflow-wrap:anywhere}
+.fb-text p{margin:0 0 .6em}.fb-text p:last-child{margin-bottom:0}
+.t-hero{font-family:var(--head);font-weight:700;line-height:1;font-size:clamp(34px,6.4cqw,110px)}
+.t-h1{font-family:var(--head);font-weight:700;line-height:1.08;font-size:clamp(26px,3.6cqw,62px)}
+.t-h2{font-family:var(--head);font-weight:600;line-height:1.2;font-size:clamp(20px,2.2cqw,36px)}
+.t-large{line-height:1.45;font-size:clamp(18px,2cqw,32px)}
+.t-body{font-size:clamp(15px,1.1cqw,19px)}
+.t-small{font-size:13px;color:var(--muted)}
+.a-left{text-align:left;align-items:flex-start}
+.a-center{text-align:center;align-items:center}
+.a-right{text-align:right;align-items:flex-end}
+.fb-image{display:block;width:100%;height:100%;padding:0;border:0;background:var(--line);overflow:hidden}
+.fb-image img{position:absolute;inset:0;width:100%;height:100%}
+button.fb-image{cursor:zoom-in}
+.fb-btn,.fb-social{display:flex;align-items:center}
+.fb-btn.a-left,.fb-social.a-left{justify-content:flex-start}
+.fb-btn.a-center,.fb-social.a-center{justify-content:center}
+.fb-btn.a-right,.fb-social.a-right{justify-content:flex-end}
+.fb-btn .btn{margin:0}
+.btn.outline{background:none;color:var(--fg);border:1.5px solid var(--fg)}
+.fb-social svg{width:24px;height:24px}
+
+/* edit mode (inside the editor's preview only) */
+.editing .fsec{outline:1px dashed rgba(43,89,195,.25);outline-offset:4px}
+.editing .fgrid{--cw:calc((100% - (var(--cols) - 1) * var(--fgap)) / var(--cols));
+  background:repeating-linear-gradient(to right,rgba(43,89,195,.06) 0 var(--cw),transparent var(--cw) calc(var(--cw) + var(--fgap)))}
+.editing .fb{cursor:move;outline:1px dashed rgba(43,89,195,.45);user-select:none;touch-action:none}
+.editing .fb.sel{outline:2px solid #2b59c3;z-index:50}
+.editing .fb img{-webkit-user-drag:none;pointer-events:none}
+.fb-h{display:none}
+.editing .fb.sel .fb-h{display:block;position:absolute;right:-7px;bottom:-7px;width:14px;height:14px;background:#fff;border:2px solid #2b59c3;border-radius:2px;cursor:nwse-resize;z-index:2}
+
 /* ---------- lightbox ---------- */
 .lb{position:fixed;inset:0;z-index:100;background:color-mix(in srgb,var(--bg) 97%,transparent);display:flex;align-items:center;justify-content:center;
   padding:56px 72px 64px;opacity:0;transition:opacity .2s;touch-action:pan-y}
@@ -220,6 +267,7 @@ function iconLinks(withLabels) {
   return list.length ? el('div', { class: 'icons' }, list) : null;
 }
 function galleries() { return (site.galleries || []).filter(g => g && g.id); }
+function pages() { return (Array.isArray(site.pages) ? site.pages : []).filter(p => p && p.id); }
 
 // ---------- theme ----------
 function applyTheme() {
@@ -244,6 +292,8 @@ function applyTheme() {
 function route() {
   const part = decodeURIComponent((location.hash.replace(/^#\/?/, '').split('/')[0]) || '');
   const gs = galleries();
+  const cp = pages().find(p => p.id === part);
+  if (cp) return { page: 'custom', custom: cp };
   if (part === 'about' || part === 'contact') return { page: part };
   const g = gs.find(x => x.id === part);
   if (g) return { page: 'gallery', gallery: g };
@@ -256,7 +306,8 @@ function navItems() {
   if (cats) items.push({ href: '#/', label: site.home.label || 'Work', key: 'home' });
   for (const g of galleries()) if (g.showInNav !== false) items.push({ href: '#/' + encodeURIComponent(g.id), label: g.title || g.id, key: 'g:' + g.id });
   const minor = [];
-  if (String(site.about || '').trim() || site.aboutImage) minor.push({ href: '#/about', label: 'About', key: 'about' });
+  for (const p of pages()) if (p.showInNav !== false) minor.push({ href: '#/' + encodeURIComponent(p.id), label: p.title || p.id, key: 'p:' + p.id });
+  if ((String(site.about || '').trim() || site.aboutImage) && !pages().some(p => p.id === 'about')) minor.push({ href: '#/about', label: 'About', key: 'about' });
   if (emailOk(site.email) || socials().length) minor.push({ href: '#/contact', label: 'Contact', key: 'contact' });
   return { items, minor };
 }
@@ -269,7 +320,7 @@ function render() {
   const r = route();
   current = r;
   const sidebar = (site.theme || {}).nav === 'sidebar';
-  const activeKey = r.page === 'home' ? 'home' : r.page === 'gallery' ? (r.isHome ? 'g:' + r.gallery.id : 'g:' + r.gallery.id) : r.page;
+  const activeKey = r.page === 'home' ? 'home' : r.page === 'gallery' ? 'g:' + r.gallery.id : r.page === 'custom' ? 'p:' + r.custom.id : r.page;
   const { items, minor } = navItems();
   const link = it => el('li', {}, el('a', { href: it.href, 'aria-current': it.key === activeKey ? 'page' : null }, it.label));
 
@@ -293,16 +344,20 @@ function render() {
 
   const main = el('main', { id: 'main', tabindex: '-1' });
   let title = '';
+  if (r.page === 'home' || r.isHome) renderSections(main, site.home && site.home.sections);
   if (r.page === 'home') { renderHome(main); title = ''; }
   else if (r.page === 'gallery') { renderGallery(main, r.gallery, r.isHome); title = r.isHome ? '' : r.gallery.title; }
+  else if (r.page === 'custom') { main.append(el('h1', { class: 'sr-only' }, r.custom.title || '')); renderSections(main, r.custom.sections); title = r.custom.title; }
   else if (r.page === 'about') { renderAbout(main); title = 'About'; }
   else if (r.page === 'contact') { renderContact(main); title = 'Contact'; }
 
   const foot = el('footer', { class: 'footer' }, el('span', {}, `© ${new Date().getFullYear()} ${site.name || ''}`), iconLinks(false));
   app.className = 'site' + (sidebar ? ' sidebar' : '');
+  document.body.classList.toggle('editing', EDIT);
   app.replaceChildren(masthead, el('div', { style: 'flex:1;display:flex;flex-direction:column;min-width:0' }, main, foot));
   document.title = (title ? title + ' — ' : '') + (site.name || 'Portfolio');
   layoutMasonry();
+  if (EDIT && SEL) { const n = document.querySelector(`.fb[data-id="${CSS.escape(SEL)}"]`); if (n) n.classList.add('sel'); }
 }
 
 function renderHome(main) {
@@ -393,6 +448,183 @@ function renderContact(main) {
   main.append(box);
 }
 
+// ---------- free-layout sections ----------
+const DCOLS = 24, MCOLS = 8;
+let EDIT = false, SEL = null;
+const clampN = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.round(Number(v) || 0)));
+function rect(r, cols) {
+  if (!r || typeof r !== 'object') return null;
+  const x = clampN(r.x, 0, cols - 1);
+  return { x, y: clampN(r.y, 0, 500), w: clampN(r.w || 1, 1, cols - x), h: clampN(r.h || 1, 1, 200) };
+}
+function blocksOf(sec) { return (sec && Array.isArray(sec.blocks) ? sec.blocks : []).filter(b => b && b.id && rect(b.d, DCOLS)); }
+// Phone arrangement made from the desktop one: top-to-bottom, left-to-right, full width.
+function autoMobile(blocks) {
+  const out = {}; let y = 0;
+  [...blocks].sort((a, b) => (a.d.y - b.d.y) || (a.d.x - b.d.x)).forEach(b => {
+    const d = rect(b.d, DCOLS);
+    const h = b.type === 'image' ? Math.max(2, Math.round(d.h * MCOLS / d.w)) : 1;   // text rows grow to fit
+    out[b.id] = { x: 0, y, w: MCOLS, h }; y += h;
+  });
+  return out;
+}
+function mobileLayout(sec) {
+  const bl = blocksOf(sec), out = {}, missing = [];
+  let bottom = 0;
+  for (const b of bl) {
+    const m = rect(b.m, MCOLS);
+    if (m) { out[b.id] = m; bottom = Math.max(bottom, m.y + m.h); } else missing.push(b);
+  }
+  if (missing.length === bl.length) return autoMobile(bl);
+  const a = autoMobile(missing);                          // blocks added after the phone layout was arranged go at the end
+  for (const id in a) out[id] = { ...a[id], y: a[id].y + bottom };
+  return out;
+}
+function linkHref(l) {
+  l = String(l || '').trim();
+  if (!l) return '';
+  if (/^#\//.test(l)) return l;
+  if (/^mailto:/i.test(l)) return emailOk(l.slice(7)) ? l : '';
+  if (emailOk(l)) return 'mailto:' + l;
+  if (/^www\./i.test(l)) l = 'https://' + l;
+  return /^https?:\/\//i.test(l) ? l : '';
+}
+function linkAttrs(href) { return /^https?:/i.test(href) ? { href, target: '_blank', rel: 'noopener' } : { href }; }
+function renderBlock(b) {
+  const align = ['left', 'center', 'right'].includes(b.align) ? b.align : (b.type === 'text' ? 'left' : 'center');
+  if (b.type === 'text') {
+    const style = ['hero', 'h1', 'h2', 'large', 'body', 'small'].includes(b.style) ? b.style : 'body';
+    return el('div', { class: `fb-text t-${style} a-${align}` }, prose(b.text));
+  }
+  if (b.type === 'image') {
+    const s = b.src ? src(b.src) : '';
+    const img = s ? el('img', { src: s, alt: b.alt || '', loading: 'lazy', draggable: 'false', style: `object-fit:${b.fit === 'contain' ? 'contain' : 'cover'}` }) : null;
+    if (b.zoom && s) return el('button', { class: 'fb-image', type: 'button', 'aria-label': 'Enlarge ' + (b.alt || 'image'),
+      onclick: e => { if (!EDIT) openLightbox([{ src: b.src, title: b.alt || '', caption: '' }], 0, e.currentTarget); } }, img);
+    const href = linkHref(b.link);
+    return href ? el('a', { class: 'fb-image', ...linkAttrs(href) }, img) : el('div', { class: 'fb-image' }, img);
+  }
+  if (b.type === 'button') {
+    const href = linkHref(b.link) || '#/';
+    return el('div', { class: `fb-btn a-${align}` }, el('a', { class: 'btn' + (b.variant === 'outline' ? ' outline' : ''), ...linkAttrs(href) }, b.label || 'Button'));
+  }
+  if (b.type === 'social') return el('div', { class: `fb-social a-${align}` }, iconLinks(false));
+  return null;
+}
+function renderSection(sec) {
+  const bl = blocksOf(sec), ml = mobileLayout(sec);
+  const drows = Math.max(1, clampN(sec.rows, 1, 200), ...bl.map(b => { const d = rect(b.d, DCOLS); return d.y + d.h; }));
+  const mrows = Math.max(1, ...Object.values(ml).map(r => r.y + r.h));
+  const grid = el('div', { class: 'fgrid', style: `--rows:${drows};--mrows:${mrows}` });
+  bl.forEach((b, i) => {
+    const node = renderBlock(b);
+    if (!node) return;
+    const d = rect(b.d, DCOLS), m = ml[b.id];
+    node.classList.add('fb');
+    node.dataset.id = b.id;
+    for (const [k, v] of [['--dc', `${d.x + 1} / span ${d.w}`], ['--dr', `${d.y + 1} / span ${d.h}`], ['--mc', `${m.x + 1} / span ${m.w}`], ['--mr', `${m.y + 1} / span ${m.h}`], ['--z', i + 1]])
+      node.style.setProperty(k, v);
+    if (EDIT) node.append(el('span', { class: 'fb-h', 'aria-hidden': 'true' }));
+    grid.append(node);
+  });
+  const bg = /^#[0-9a-f]{3,8}$/i.test(sec.bg || '') ? sec.bg : '';
+  return el('section', { class: 'fsec' + (bg ? ' bg' : ''), 'data-id': sec.id || '', style: bg ? `background:${bg}` : null }, el('div', { class: 'fwrap' }, grid));
+}
+function renderSections(main, sections) {
+  for (const sec of Array.isArray(sections) ? sections : []) if (sec && (EDIT || blocksOf(sec).length)) main.append(renderSection(sec));
+}
+
+// Edit mode: drag to move, drag the corner square to resize. Positions snap to grid cells and
+// are sent to the editor, which owns the data and sends the updated site back.
+function allSections() { return [].concat(site.home && site.home.sections || [], ...pages().map(p => p.sections || [])); }
+function findSection(id) { return allSections().find(s => s && s.id === id); }
+function post(msg) { if (window.parent !== window) window.parent.postMessage(msg, location.origin); }
+function metrics(grid) {
+  const cs = getComputedStyle(grid), r = grid.getBoundingClientRect();
+  const cw = cs.gridTemplateColumns.split(' ').map(parseFloat), rh = cs.gridTemplateRows.split(' ').map(parseFloat);
+  const cg = parseFloat(cs.columnGap) || 0, rg = parseFloat(cs.rowGap) || 0;
+  const cx = [], ry = [];
+  let a = r.left; for (const w of cw) { cx.push(a); a += w + cg; }
+  a = r.top; for (const h of rh) { ry.push(a); a += h + rg; }
+  return { cols: cw.length, cx, cw, ry, rh, cg, rg };
+}
+function colAt(m, x) { let i = 0; while (i < m.cols - 1 && x >= m.cx[i + 1] - m.cg / 2) i++; return i; }
+function rowAt(m, y) {
+  const n = m.ry.length, end = m.ry[n - 1] + m.rh[n - 1];
+  if (y > end) return n - 1 + Math.ceil((y - end) / (m.cw[0] + m.rg));     // below the grid: keep counting rows
+  let i = 0; while (i < n - 1 && y >= m.ry[i + 1] - m.rg / 2) i++; return i;
+}
+function selectBlock(secId, blockId) {
+  SEL = blockId;
+  document.querySelectorAll('.fb.sel').forEach(n => n.classList.remove('sel'));
+  if (blockId) { const n = document.querySelector(`.fb[data-id="${CSS.escape(blockId)}"]`); if (n) n.classList.add('sel'); }
+  post({ type: 'webmake:select', section: secId, block: blockId });
+}
+function editTarget(fb) {
+  const grid = fb.parentElement, sec = findSection(grid.closest('.fsec').dataset.id);
+  const b = sec && (sec.blocks || []).find(x => x.id === fb.dataset.id);
+  if (!b) return null;
+  const m = metrics(grid), mobile = m.cols === MCOLS;
+  const lay = mobile ? mobileLayout(sec) : null;
+  return { grid, sec, b, m, mobile, lay, start: { ...(mobile ? lay[b.id] : rect(b.d, DCOLS)) } };
+}
+function applyLive(t, fb, cur) {
+  fb.style.setProperty(t.mobile ? '--mc' : '--dc', `${cur.x + 1} / span ${cur.w}`);
+  fb.style.setProperty(t.mobile ? '--mr' : '--dr', `${cur.y + 1} / span ${cur.h}`);
+  const v = t.mobile ? '--mrows' : '--rows';
+  if (cur.y + cur.h > Number(t.grid.style.getPropertyValue(v))) t.grid.style.setProperty(v, cur.y + cur.h);
+}
+function commit(t, cur) {
+  // Phone: send every block so the auto arrangement becomes a saved one and nothing else jumps.
+  post({ type: 'webmake:layout', section: t.sec.id, key: t.mobile ? 'm' : 'd', positions: t.mobile ? { ...t.lay, [t.b.id]: cur } : { [t.b.id]: cur } });
+}
+document.addEventListener('pointerdown', e => {
+  if (!EDIT || e.button !== 0) return;
+  const fb = e.target.closest('.fgrid > .fb');
+  if (!fb) { const s = e.target.closest('.fsec'); if (s) selectBlock(s.dataset.id, null); return; }
+  const t = editTarget(fb);
+  if (!t) return;
+  e.preventDefault();
+  window.focus();                                          // so arrow keys reach this frame
+  selectBlock(t.sec.id, t.b.id);
+  const resize = !!e.target.closest('.fb-h');
+  const c0 = colAt(t.m, e.clientX), r0 = rowAt(t.m, e.clientY);
+  let cur = { ...t.start }, moved = false;
+  fb.setPointerCapture(e.pointerId);
+  const onMove = ev => {
+    if (!moved && Math.abs(ev.clientX - e.clientX) + Math.abs(ev.clientY - e.clientY) < 4) return;
+    moved = true;
+    const dc = colAt(t.m, ev.clientX) - c0, dr = rowAt(t.m, ev.clientY) - r0;
+    cur = resize
+      ? { ...t.start, w: clampN(t.start.w + dc, 1, t.m.cols - t.start.x), h: Math.max(1, t.start.h + dr) }
+      : { ...t.start, x: clampN(t.start.x + dc, 0, t.m.cols - t.start.w), y: Math.max(0, t.start.y + dr) };
+    applyLive(t, fb, cur);
+  };
+  const onUp = () => {
+    fb.removeEventListener('pointermove', onMove); fb.removeEventListener('pointerup', onUp); fb.removeEventListener('pointercancel', onUp);
+    if (moved) commit(t, cur);
+  };
+  fb.addEventListener('pointermove', onMove); fb.addEventListener('pointerup', onUp); fb.addEventListener('pointercancel', onUp);
+});
+document.addEventListener('click', e => { if (EDIT && e.target.closest('.fsec')) e.preventDefault(); }, true);
+document.addEventListener('keydown', e => {
+  if (!EDIT || !SEL || !lb.hidden || /input|textarea|select/i.test(e.target.tagName)) return;
+  const fb = document.querySelector(`.fb[data-id="${CSS.escape(SEL)}"]`);
+  if (!fb) return;
+  const t = editTarget(fb);
+  if (!t) return;
+  if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); post({ type: 'webmake:delete', section: t.sec.id, block: t.b.id }); return; }
+  const dir = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+  if (!dir) { if (e.key === 'Escape') selectBlock(t.sec.id, null); return; }
+  e.preventDefault();
+  const s = t.start;
+  const cur = e.shiftKey
+    ? { ...s, w: clampN(s.w + dir[0], 1, t.m.cols - s.x), h: Math.max(1, s.h + dir[1]) }
+    : { ...s, x: clampN(s.x + dir[0], 0, t.m.cols - s.w), y: Math.max(0, s.y + dir[1]) };
+  applyLive(t, fb, cur);
+  commit(t, cur);
+});
+
 // ---------- lightbox ----------
 const lb = document.getElementById('lb'), lbImg = document.getElementById('lbImg'), lbCap = document.getElementById('lbCap'),
       lbCount = document.getElementById('lbCount'), lbPrev = document.getElementById('lbPrev'), lbNext = document.getElementById('lbNext'),
@@ -471,6 +703,8 @@ if (PREVIEW) {
   window.addEventListener('message', e => {
     if (e.origin !== location.origin || !e.data || e.data.type !== 'webmake:data') return;
     const y = window.scrollY;
+    EDIT = !!e.data.edit;
+    SEL = e.data.selected || null;
     setData(e.data.site, e.data.files || {});
     window.scrollTo(0, y);
   });
